@@ -14,10 +14,6 @@ from langchain.callbacks import get_openai_callback
 from pydub import AudioSegment
 import tempfile
 
-AudioSegment.converter = "/opt/homebrew/bin/ffmpeg"
-AudioSegment.ffmpeg = "/opt/homebrew/bin/ffmpeg"
-AudioSegment.ffprobe = "/opt/homebrew/bin/ffprobe"
-
 # Global history list to keep track of uploaded files and generated audios
 history = []
 
@@ -55,16 +51,17 @@ def display_history():
     # 获取 uploads 和 audios 目录中的所有文件
     uploaded_pdfs = os.listdir("uploads")
     generated_audios = os.listdir("audios")
+    st.sidebar.title("History")
 
     # 展示每一个文件
     for pdf_name, audio_name in zip(uploaded_pdfs, generated_audios):
         pdf_path = os.path.join("uploads", pdf_name)
         audio_path = os.path.join("audios", audio_name)
 
-        st.markdown(f"**{pdf_name}** [Download]({pdf_path})")
+        st.sidebar.markdown(f"**{pdf_name}** [Download]({pdf_path})")
         with open(audio_path, "rb") as audio_file:
             audio_bytes = audio_file.read()
-        st.audio(audio_bytes, format="audio/mp3")
+        st.sidebar.audio(audio_bytes, format="audio/mp3")
 
 
 def save_uploaded_pdf(pdf):
