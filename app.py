@@ -61,11 +61,10 @@ def display_history():
         pdf_path = os.path.join("uploads", pdf_name)
         audio_path = os.path.join("audios", audio_name)
 
-        st.markdown(f"### {pdf_name}")
+        st.markdown(f"**{pdf_name}** [Download]({pdf_path})")
         with open(audio_path, "rb") as audio_file:
             audio_bytes = audio_file.read()
         st.audio(audio_bytes, format="audio/mp3")
-        st.markdown(f"[Download PDF]({pdf_path})")
 
 
 def save_uploaded_pdf(pdf):
