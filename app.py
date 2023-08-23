@@ -51,6 +51,19 @@ def display_history():
     # 获取 uploads 和 audios 目录中的所有文件
     uploaded_pdfs = os.listdir("uploads")
     generated_audios = os.listdir("audios")
+
+    # 自定义 CSS 为按钮增加垂直填充
+    custom_css = """
+        <style>
+            .stButton>button {
+                padding-top: 0.05em;
+                padding-bottom: 0.05em;
+            }
+        </style>
+    """
+    st.markdown(custom_css, unsafe_allow_html=True)
+
+    # 在侧边栏上添加一个标题
     st.sidebar.title("History")
 
     # 展示每一个文件
@@ -58,7 +71,20 @@ def display_history():
         pdf_path = os.path.join("uploads", pdf_name)
         audio_path = os.path.join("audios", audio_name)
 
-        st.sidebar.markdown(f"**{pdf_name}** [Download]({pdf_path})")
+        # 使用 columns 创建两个并排的部分
+        col1, col2 = st.sidebar.beta_columns([3, 1])
+
+        # 在第一列放置文件名（并加粗）和下载链接
+        with col1:
+            st.markdown(f"**{pdf_name}** [Down]({pdf_path})")
+
+        # 在第二列放置删除按钮
+        with col2:
+            if st.button(f"Del"):
+                os.remove(pdf_path)
+                os.remove(audio_path)
+                st.sidebar.success(f"Deleted {pdf_name}")
+
         with open(audio_path, "rb") as audio_file:
             audio_bytes = audio_file.read()
         st.sidebar.audio(audio_bytes, format="audio/mp3")
@@ -132,8 +158,8 @@ def main():
     global history
 
     load_dotenv()
-    st.set_page_config(page_title="Ask your PDF")
-    st.header("Ask your PDF ")
+    st.set_page_config(page_title=" ")
+    st.header(" ")
 
     display_history()
 
