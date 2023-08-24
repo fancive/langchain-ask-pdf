@@ -10,9 +10,10 @@ from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.chains.question_answering import load_qa_chain
 from langchain.llms import OpenAI
-from langchain.callbacks import get_openai_callback
+from langchain.callbacks import StreamlitCallbackHandler
 from pydub import AudioSegment
 import tempfile
+import threading
 
 # Global history list to keep track of uploaded files and generated audios
 history = []
@@ -72,7 +73,7 @@ def display_history():
         audio_path = os.path.join("audios", audio_name)
 
         # 使用 columns 创建两个并排的部分
-        col1, col2 = st.sidebar.beta_columns([3, 1])
+        col1, col2 = st.sidebar.columns([3, 1])
 
         # 在第一列放置文件名（并加粗）和下载链接
         with col1:
@@ -90,6 +91,15 @@ def display_history():
         st.sidebar.audio(audio_bytes, format="audio/mp3")
 
 
+def async_generate_audio(q, response, audio_list):
+    """Asynchronously generate audio."""
+    question_and_answer_audio = generate_audio_for_question_and_answer(q, response)
+    question_and_answer_audio = adjust_playback_speed(
+        question_and_answer_audio, speed=1.25
+    )
+    audio_list.append(question_and_answer_audio)
+
+
 def save_uploaded_pdf(pdf):
     """Save the uploaded PDF and return its path."""
     pdf_path = os.path.join("uploads", pdf.name)
@@ -105,33 +115,48 @@ def process_questions_and_generate_audio(pdf_path, questions):
         separator="\n", chunk_size=1000, chunk_overlap=200, length_function=len
     )
     chunks = text_splitter.split_text(text)
+    col1, col2 = st.columns([6, 1])
 
     embeddings = OpenAIEmbeddings()
+    st.write("Generating knowledge base...")
     knowledge_base = FAISS.from_texts(chunks, embeddings)
+    st.success("Knowledge base generated!")
 
     llm = OpenAI()
     chain = load_qa_chain(llm, chain_type="stuff")
 
     overall_audio = AudioSegment.empty()
     for q in questions:
-        docs = knowledge_base.similarity_search(q)
-        with get_openai_callback() as cb:
-            response = chain.run(input_documents=docs, question=q)
+        with col1:
+            st.write("Question:", q)
 
-        question_and_answer_audio = generate_audio_for_question_and_answer(q, response)
-        question_and_answer_audio = adjust_playback_speed(
-            question_and_answer_audio, speed=1.25
-        )
+        with st.spinner("Generating..."):
+            docs = knowledge_base.similarity_search(q)
+            cb = StreamlitCallbackHandler(st.container())
+            response = chain.run(input_documents=docs, question=q, callbacks=[cb])
+            # Display each question and answer in the left column
+            with col1:
+                st.write("Answer:", response)
 
-        overall_audio += question_and_answer_audio
+            # Asynchronously generate audio
+            audio_list = []
+            audio_thread = threading.Thread(
+                target=async_generate_audio, args=(q, response, audio_list)
+            )
+            audio_thread.start()
 
-        # Display each question, answer, and the corresponding audio
-        st.write("Question:", q)
-        st.write("Answer:", response)
+            # Wait for the audio to be generated
+            while not audio_list:
+                pass
 
-        with tempfile.NamedTemporaryFile(delete=True, suffix=".mp3") as fp:
-            question_and_answer_audio.export(fp.name, format="mp3")
-            st.audio(fp.name, format="audio/mp3")
+            question_and_answer_audio = audio_list[0]
+            overall_audio += question_and_answer_audio
+
+            # Display the corresponding audio in the right column
+            with col2:
+                with tempfile.NamedTemporaryFile(delete=True, suffix=".mp3") as fp:
+                    question_and_answer_audio.export(fp.name, format="mp3")
+                    st.audio(fp.name, format="audio/mp3")
 
     # Save the combined audio
     audio_path = os.path.join("audios", os.path.basename(pdf_path))
@@ -158,7 +183,7 @@ def main():
     global history
 
     load_dotenv()
-    st.set_page_config(page_title=" ")
+    st.set_page_config(page_title=" ", layout="wide")
     st.header(" ")
 
     display_history()
